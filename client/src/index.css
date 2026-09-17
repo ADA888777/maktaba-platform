@@ -1,0 +1,151 @@
+@import "@fontsource/ibm-plex-sans-arabic/300.css";
+@import "@fontsource/ibm-plex-sans-arabic/400.css";
+@import "@fontsource/ibm-plex-sans-arabic/500.css";
+@import "@fontsource/ibm-plex-sans-arabic/600.css";
+@import "@fontsource/ibm-plex-sans-arabic/700.css";
+@import "tailwindcss";
+
+/* ───────────── الهوية البصرية ───────────── */
+@theme {
+  --font-sans: "IBM Plex Sans Arabic", system-ui, "Segoe UI", Tahoma, sans-serif;
+
+  /* الرمادي */
+  --color-ink-900: #2c3131;
+  --color-ink-800: #414747;
+  --color-ink-700: #626767;
+  --color-ink-500: #818585;
+  --color-ink-400: #A0A3A3;
+  --color-ink-300: #BFC1C1;
+  --color-ink-200: #D9DADA;
+  --color-ink-100: #ECEDED;
+  --color-ink-50: #F6F7F7;
+
+  /* الأزرق */
+  --color-brand-900: #174B78;
+  --color-brand-800: #1D4D7B;
+  --color-brand-700: #215987;
+  --color-brand-600: #2E78AE;
+  --color-brand-500: #3C91C2;
+  --color-brand-400: #58B0DB;
+  --color-brand-300: #78C9E7;
+  --color-brand-100: #E4F2FA;
+  --color-brand-50: #F1F8FC;
+
+  /* الأزرق البترولي */
+  --color-petrol-800: #155274;
+  --color-petrol-700: #1B617F;
+  --color-petrol-600: #287F99;
+  --color-petrol-500: #369BAF;
+  --color-petrol-400: #50B8C4;
+  --color-petrol-300: #73D0D5;
+
+  /* الفيروزي */
+  --color-teal-800: #176B7B;
+  --color-teal-700: #208595;
+  --color-teal-600: #2B9EAB;
+  --color-teal-500: #40B8C0;
+  --color-teal-400: #5ACDD0;
+  --color-teal-300: #83DDDC;
+  --color-teal-100: #E3F6F6;
+  --color-teal-50: #F0FAFA;
+
+  /* الأخضر */
+  --color-leaf-700: #4E7A55;
+  --color-leaf-600: #64966C;
+  --color-leaf-500: #79A97D;
+  --color-leaf-400: #91BC91;
+  --color-leaf-300: #A9CDA4;
+  --color-leaf-200: #C1DDBA;
+  --color-leaf-100: #D9EBD1;
+  --color-leaf-50: #EFF6EB;
+
+  /* حالات */
+  --color-danger-700: #A63D3D;
+  --color-danger-50: #FBEFEF;
+  --color-warn-700: #8A5A12;
+  --color-warn-50: #FBF4E6;
+
+  --radius-card: 1.25rem;
+  --shadow-soft: 0 1px 2px rgb(23 75 120 / 0.04), 0 8px 24px -12px rgb(23 75 120 / 0.14);
+  --shadow-lift: 0 2px 4px rgb(23 75 120 / 0.05), 0 18px 40px -18px rgb(23 75 120 / 0.28);
+
+  --animate-fade-up: fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-fade-in: fade-in 0.2s ease-out both;
+  --animate-scale-in: scale-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.97) translateY(6px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-ink-50 font-sans text-ink-800 antialiased;
+    overflow-x: hidden;
+  }
+  h1, h2, h3, h4 {
+    @apply text-ink-900;
+    text-wrap: balance;
+  }
+  p { text-wrap: pretty; }
+  :focus-visible {
+    outline: 2px solid var(--color-brand-600);
+    outline-offset: 2px;
+  }
+  input[type="date"], input[type="datetime-local"] { direction: rtl; }
+  input[type="email"], input[type="tel"], input[type="url"], .ltr { direction: ltr; text-align: right; }
+  ::selection { background: var(--color-teal-300); color: var(--color-ink-900); }
+}
+
+@layer components {
+  .brand-gradient {
+    background-image: linear-gradient(120deg, #174B78 0%, #1B617F 45%, #14A39D 100%);
+  }
+  .brand-gradient-text {
+    background-image: linear-gradient(120deg, #174B78, #14A39D);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .container-page {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+  .card {
+    @apply rounded-[var(--radius-card)] border border-ink-200/70 bg-white shadow-[var(--shadow-soft)];
+  }
+  /* يُستخدم مع brand-gradient: يضيف لمسات ضوئية فوق التدرج نفسه */
+  .brand-gradient.hero-pattern {
+    background-image:
+      radial-gradient(circle at 15% 20%, rgb(255 255 255 / 0.10) 0, transparent 40%),
+      radial-gradient(circle at 85% 80%, rgb(131 221 220 / 0.18) 0, transparent 45%),
+      linear-gradient(120deg, #174B78 0%, #1B617F 45%, #14A39D 100%);
+  }
+  .skeleton {
+    @apply animate-pulse rounded-lg bg-ink-200/60;
+  }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-ink-300) transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
