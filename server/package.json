@@ -13,6 +13,8 @@
     "test": "node --disable-warning=ExperimentalWarning --import tsx --test src/tests/*.test.ts"
   },
   "dependencies": {
+    "pg": "^8.13.1",
+    "@supabase/supabase-js": "^2.47.10",
     "cookie-parser": "^1.4.7",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
@@ -22,6 +24,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@types/pg": "^8.11.10",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",
     "@types/multer": "^2.2.0",
