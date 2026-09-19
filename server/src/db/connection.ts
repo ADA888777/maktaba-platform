@@ -1,38 +1,65 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import { Pool, type PoolClient, type QueryResultRow } from 'pg';
 import { migrate } from './schema.js';
 
-let db: DatabaseSync | null = null;
+let pool: Pool | null = null;
 
-export function openDatabase(file: string): DatabaseSync {
-  if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });
-  const instance = new DatabaseSync(file);
-  instance.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
-  migrate(instance);
-  return instance;
+function needsSsl(connectionString: string): boolean {
+  return !connectionString.includes('localhost') && !connectionString.includes('127.0.0.1');
 }
 
-export function initDatabase(file: string): DatabaseSync {
-  db = openDatabase(file);
-  return db;
+/** يهيئ مجمّع الاتصالات مرة واحدة. سلسلة الاتصال تأتي من DATABASE_URL في متغيرات البيئة فقط. */
+export function initPool(connectionString: string): Pool {
+  if (pool) return pool;
+  pool = new Pool({
+    connectionString,
+    max: Number(process.env.PG_POOL_MAX ?? 5),
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+    ssl: needsSsl(connectionString) ? { rejectUnauthorized: process.env.PG_SSL_STRICT === 'true' } : undefined,
+  });
+  return pool;
 }
 
-export function getDb(): DatabaseSync {
-  if (!db) throw new Error('قاعدة البيانات غير مهيأة');
-  return db;
+export function getPool(): Pool {
+  if (!pool) throw new Error('قاعدة البيانات غير مهيأة');
+  return pool;
 }
 
-/** تنفيذ مجموعة عمليات كوحدة واحدة */
-export function transaction<T>(fn: () => T): T {
-  const d = getDb();
-  d.exec('BEGIN');
+/** يهيئ الاتصال ويطبّق الترحيلات */
+export async function initDatabase(connectionString: string): Promise<Pool> {
+  const p = initPool(connectionString);
+  await migrate(p);
+  return p;
+}
+
+export async function query<T extends QueryResultRow = QueryResultRow>(sql: string, params: unknown[] = []): Promise<T[]> {
+  const result = await getPool().query<T>(sql, params);
+  return result.rows;
+}
+
+export async function queryOne<T extends QueryResultRow = QueryResultRow>(sql: string, params: unknown[] = []): Promise<T | null> {
+  const rows = await query<T>(sql, params);
+  return rows[0] ?? null;
+}
+
+/** تنفيذ مجموعة عمليات كوحدة واحدة داخل معاملة */
+export async function transaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await getPool().connect();
   try {
-    const result = fn();
-    d.exec('COMMIT');
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
     return result;
   } catch (e) {
-    d.exec('ROLLBACK');
+    await client.query('ROLLBACK');
     throw e;
+  } finally {
+    client.release();
   }
+}
+
+export async function closeDatabase(): Promise<void> {
+  if (!pool) return;
+  await pool.end();
+  pool = null;
 }
