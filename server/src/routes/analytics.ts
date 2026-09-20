@@ -6,19 +6,21 @@ import { HttpError } from '../utils/http.js';
 
 export const analyticsRouter = Router();
 
-const targetValidators: Partial<Record<AnalyticsEventType, (id: number) => boolean>> = {
-  resource_open: (id) => Boolean(resourcesRepo.get(id)?.isActive),
-  survey_open: (id) => Boolean(surveysRepo.get(id)?.isPublished),
-  borrow_start: (id) => Boolean(booksRepo.get(id)?.isActive),
+const targetValidators: Partial<Record<AnalyticsEventType, (id: number) => Promise<boolean>>> = {
+  resource_open: async (id) => Boolean((await resourcesRepo.get(id))?.isActive),
+  survey_open: async (id) => Boolean((await surveysRepo.get(id))?.isPublished),
+  borrow_start: async (id) => Boolean((await booksRepo.get(id))?.isActive),
 };
 
-/** تسجيل حدث استخدام مجهول (بدون أي بيانات شخصية) */
-analyticsRouter.post('/track', (req, res) => {
+/** Records one anonymous usage event (no personal data at all) */
+analyticsRouter.post('/track', async (req, res) => {
   const data = trackSchema.parse(req.body);
   if (!(PUBLIC_EVENT_TYPES as readonly string[]).includes(data.type)) throw new HttpError(400, 'نوع حدث غير معروف');
   const type = data.type as AnalyticsEventType;
   const validate = targetValidators[type];
-  if (validate && (!data.targetId || !validate(data.targetId))) throw new HttpError(400, 'العنصر المرتبط بالحدث غير صالح');
+  if (validate && (!data.targetId || !(await validate(data.targetId)))) {
+    throw new HttpError(400, 'العنصر المرتبط بالحدث غير صالح');
+  }
   trackEvent({
     type,
     targetId: validate ? data.targetId : null,
