@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { settingsRepo } from '../repositories/index.js';
 
-/** نطاقات Microsoft Forms المسموح بها — يُرفض أي رابط خارجها */
+/** Allowed Microsoft Forms hosts - any link outside these is rejected */
 export const MS_FORMS_HOSTS = ['forms.office.com', 'forms.microsoft.com', 'forms.cloud.microsoft', 'forms.office365.us'];
 
 export function isMicrosoftFormsUrl(value: string): boolean {
@@ -14,25 +14,25 @@ export function isMicrosoftFormsUrl(value: string): boolean {
 }
 
 const msFormUrl = z
-  .string()
-  .trim()
-  .max(2000)
-  .refine((v) => v === '' || isMicrosoftFormsUrl(v), 'يجب أن يكون الرابط من Microsoft Forms ويبدأ بـ https://forms.office.com');
+.string()
+.trim()
+.max(2000)
+.refine((v) => v === '' || isMicrosoftFormsUrl(v), 'يجب أن يكون الرابط من Microsoft Forms ويبدأ بـ https://forms.office.com');
 
-/** مفاتيح حقول نموذج الاستعارة التي يمكن تعبئتها مسبقًا */
+/** Borrow form fields that can be prefilled */
 export const BORROW_FIELDS = [
   'fullName', 'traineeId', 'specialty', 'email', 'phone',
   'bookTitle', 'bookAuthor', 'borrowDate', 'returnDate', 'notes', 'referenceCode',
-] as const;
+  ] as const;
 export const VISIT_FIELDS = [
   'fullName', 'specialty', 'hasVisited', 'reasons', 'otherReason', 'mainService', 'otherService', 'visitFrequency', 'suggestions',
-] as const;
+  ] as const;
 
 const prefillMap = z.record(z.string(), z.string().trim().max(120).regex(/^[A-Za-z0-9_-]*$/, 'معرّف سؤال غير صالح'));
 
 const formConfig = z.object({
-  /** msforms: فتح النموذج الرسمي معبأً مسبقًا — flow: إرسال مباشر عبر Power Automate */
-  mode: z.enum(['msforms', 'flow']),
+  /** msforms: open the official prefilled form - flow: send through Power Automate */
+                            mode: z.enum(['msforms', 'flow']),
   msFormUrl,
   openIn: z.enum(['newtab', 'embed']),
   prefill: prefillMap,
@@ -82,13 +82,10 @@ export const defaultSettings: SiteSettings = {
     formsOwnerAccount: '',
   },
   lists: {
-    specialties: [
-      'التقنية الإدارية', 'تقنية البرمجيات', 'الدعم الفني', 'الشبكات', 'التصميم الجرافيكي',
-      'المحاسبة', 'التسويق', 'الموارد البشرية', 'السكرتارية التنفيذية', 'تقنية الأزياء', 'أخرى',
-    ],
-    resourceTypes: ['مكتبة رقمية', 'قاعدة بيانات', 'مجلات علمية', 'منصة تعليمية', 'كتب إلكترونية', 'محرك بحث أكاديمي'],
-    projectTypes: ['مشروع تخرج', 'مبادرة', 'بحث', 'مسابقة', 'معرض'],
-    departments: ['المكتبة', 'شؤون المتدربات', 'قسم التقنية', 'قسم الإدارة', 'النشاط الطلابي'],
+    specialties: [],
+    resourceTypes: [],
+    projectTypes: [],
+    departments: [],
   },
   borrow: {
     mode: 'msforms',
@@ -96,9 +93,9 @@ export const defaultSettings: SiteSettings = {
     openIn: 'newtab',
     prefill: {},
     requireEmail: false,
-    requirePhone: true,
+    requirePhone: false,
     requireReturnDate: true,
-    defaultLoanDays: 14,
+  defaultLoanDays: 14,
   },
   visit: { mode: 'msforms', msFormUrl: '', openIn: 'newtab', prefill: {} },
   notifications: { enabled: true, daysAhead: 14 },
@@ -114,20 +111,32 @@ function merge<T>(base: T, override: unknown): T {
   return out as T;
 }
 
-export function getSettings(): SiteSettings {
-  const stored = settingsRepo.get<Partial<SiteSettings>>('site_settings');
+/**
+* Settings are cached in memory: they are read once at boot and refreshed on save,
+* so every request can read them without an extra database round trip.
+*/
+let cache: SiteSettings | null = null;
+
+export async function loadSettings(): Promise<SiteSettings> {
+  const stored = await settingsRepo.get<Partial<SiteSettings>>('site_settings');
   const merged = merge(defaultSettings, stored ?? {});
   const parsed = settingsSchema.safeParse(merged);
-  return parsed.success ? parsed.data : defaultSettings;
+  cache = parsed.success ? parsed.data : defaultSettings;
+  return cache;
 }
 
-export function saveSettings(input: unknown): SiteSettings {
+export function getSettings(): SiteSettings {
+  return cache ?? defaultSettings;
+}
+
+export async function saveSettings(input: unknown): Promise<SiteSettings> {
   const data = settingsSchema.parse(input);
-  settingsRepo.set('site_settings', data);
+  await settingsRepo.set('site_settings', data);
+  cache = data;
   return data;
 }
 
-/** يبني رابط النموذج الرسمي مع القيم المعبأة مسبقًا — يُستخدم في الواجهة أيضًا بنفس المنطق */
+/** Builds the official form link with prefilled values - the client uses the same logic */
 export function buildPrefilledUrl(base: string, prefill: Record<string, string>, values: Record<string, string>): string {
   const url = new URL(base);
   for (const [field, param] of Object.entries(prefill)) {
