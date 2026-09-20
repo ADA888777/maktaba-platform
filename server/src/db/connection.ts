@@ -7,15 +7,41 @@ function needsSsl(connectionString: string): boolean {
   return !connectionString.includes('localhost') && !connectionString.includes('127.0.0.1');
 }
 
+/**
+ * يحوّل رابط Supabase المباشر إلى رابط Session Pooler تلقائيًا.
+ * الاتصال المباشر عبر db.PROJECT.supabase.co متاح على IPv6 فقط، ومنصات مثل Render
+ * لا تدعم IPv6 فيظهر الخطأ ENETUNREACH، بينما Session Pooler يعمل عبر IPv4 مجانًا.
+ */
+export function normalizeSupabaseUrl(connectionString: string): string {
+  const prefixMatch = /^postgres(?:ql)?:\/\//i.exec(connectionString);
+  if (!prefixMatch) return connectionString;
+  const prefix = prefixMatch[0];
+  try {
+    const url = new URL('http://' + connectionString.slice(prefix.length));
+    const hostMatch = /^db\.([a-z0-9]+)\.supabase\.co$/i.exec(url.hostname);
+    if (!hostMatch) return connectionString;
+    const projectRef = hostMatch[1];
+    const region = (process.env.SUPABASE_REGION ?? 'ap-northeast-2').trim();
+    url.hostname = 'aws-0-' + region + '.pooler.supabase.com';
+    url.port = '5432';
+    if (!url.username.includes('.')) url.username = 'postgres.' + projectRef;
+    console.log('[db] تم تحويل الاتصال المباشر إلى Session Pooler:', url.hostname);
+    return prefix + url.toString().slice('http://'.length);
+  } catch {
+    return connectionString;
+  }
+}
+
 /** Initialises the connection pool once. The connection string comes from DATABASE_URL only. */
 export function initPool(connectionString: string): Pool {
   if (pool) return pool;
+  const target = normalizeSupabaseUrl(connectionString.trim());
   pool = new Pool({
-    connectionString,
+    connectionString: target,
     max: Number(process.env.PG_POOL_MAX ?? 5),
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 15000,
-    ssl: needsSsl(connectionString) ? { rejectUnauthorized: process.env.PG_SSL_STRICT === 'true' } : undefined,
+    ssl: needsSsl(target) ? { rejectUnauthorized: process.env.PG_SSL_STRICT === 'true' } : undefined,
   });
   pool.on('error', (err) => console.error('[db] pool error:', err.message));
   return pool;
