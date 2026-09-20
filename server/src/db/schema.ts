@@ -1,180 +1,209 @@
-import type { DatabaseSync } from 'node:sqlite';
+import type { Pool } from 'pg';
 
 /**
- * مخطط قاعدة البيانات.
- * ملاحظة الخصوصية: لا توجد أي أعمدة لبيانات الطالبات الشخصية (الاسم، الرقم التدريبي،
- * البريد، الجوال). هذه البيانات تذهب مباشرة إلى Microsoft Forms / Power Automate
- * في حساب المؤسسة. الجداول هنا للمحتوى العام وللإحصائيات المجهولة فقط.
+ * Database schema for PostgreSQL (Supabase).
+ * Privacy note: no columns for personal trainee data (name, trainee id, email, phone).
+ * Personal data goes straight to Microsoft Forms / Power Automate in the institution account.
+ * Tables here hold public content and anonymous statistics only.
+ * Every statement is idempotent so it can run safely on every boot.
  */
 const migrations: string[] = [
-  /* 1 — الجداول الأساسية */ `
-  CREATE TABLE IF NOT EXISTS categories (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    kind TEXT NOT NULL CHECK (kind IN ('book','resource','project')),
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-    UNIQUE (name, kind)
-  );
+    `
+    create or replace function public.iso_now() returns text language sql stable as $iso$
+select to_char(now() at time zone 'utc','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+$iso$;
 
-  CREATE TABLE IF NOT EXISTS books (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    author TEXT NOT NULL DEFAULT '',
-    category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
-    specialty TEXT NOT NULL DEFAULT '',
-    description TEXT NOT NULL DEFAULT '',
-    cover_url TEXT NOT NULL DEFAULT '',
-    publisher TEXT NOT NULL DEFAULT '',
-    published_year INTEGER,
-    copies_total INTEGER NOT NULL DEFAULT 1 CHECK (copies_total >= 0),
-    copies_available INTEGER NOT NULL DEFAULT 1 CHECK (copies_available >= 0),
-    is_active INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-  );
+create table if not exists public.categories (
+  id serial primary key,
+    name text not null,
+      kind text not null check (kind in ('book','resource','project')),
+        created_at text not null default public.iso_now(),
+          unique (name, kind)
+          );
 
-  CREATE TABLE IF NOT EXISTS electronic_resources (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    resource_type TEXT NOT NULL DEFAULT '',
-    specialty TEXT NOT NULL DEFAULT '',
-    category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
-    url TEXT NOT NULL,
-    icon TEXT NOT NULL DEFAULT 'globe',
-    image_url TEXT NOT NULL DEFAULT '',
-    is_active INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-  );
+          create table if not exists public.books (
+          id serial primary key,
+          title text not null,
+          author text not null default '',
+          category_id integer references public.categories(id) on delete set null,
+          specialty text not null default '',
+          description text not null default '',
+          cover_url text not null default '',
+          publisher text not null default '',
+          published_year integer,
+          copies_total integer not null default 1 check (copies_total >= 0),
+          copies_available integer not null default 1 check (copies_available >= 0),
+          is_active integer not null default 1,
+          created_at text not null default public.iso_now(),
+          updated_at text not null default public.iso_now()
+          );
+          create index if not exists idx_books_category on public.books(category_id);
+          create index if not exists idx_books_active on public.books(is_active);
+          create index if not exists idx_books_created on public.books(created_at);
 
-  CREATE TABLE IF NOT EXISTS projects (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    team_name TEXT NOT NULL DEFAULT '',
-    show_team INTEGER NOT NULL DEFAULT 0,
-    specialty TEXT NOT NULL DEFAULT '',
-    topic TEXT NOT NULL DEFAULT '',
-    description TEXT NOT NULL DEFAULT '',
-    project_date TEXT,
-    project_type TEXT NOT NULL DEFAULT '',
-    category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
-    image_url TEXT NOT NULL DEFAULT '',
-    file_url TEXT NOT NULL DEFAULT '',
-    is_published INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-  );
+          create table if not exists public.electronic_resources (
+          id serial primary key,
+          name text not null,
+          description text not null default '',
+          resource_type text not null default '',
+          specialty text not null default '',
+          category_id integer references public.categories(id) on delete set null,
+          url text not null,
+          icon text not null default 'globe',
+          image_url text not null default '',
+          is_active integer not null default 1,
+          created_at text not null default public.iso_now(),
+          updated_at text not null default public.iso_now()
+          );
+          create index if not exists idx_resources_category on public.electronic_resources(category_id);
+          create index if not exists idx_resources_active on public.electronic_resources(is_active);
 
-  CREATE TABLE IF NOT EXISTS events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    starts_at TEXT NOT NULL,
-    ends_at TEXT,
-    location TEXT NOT NULL DEFAULT '',
-    department TEXT NOT NULL DEFAULT '',
-    specialty TEXT NOT NULL DEFAULT '',
-    image_url TEXT NOT NULL DEFAULT '',
-    status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled','postponed','cancelled')),
-    is_published INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-  );
-  CREATE INDEX IF NOT EXISTS idx_events_starts ON events(starts_at);
+          create table if not exists public.projects (
+          id serial primary key,
+          title text not null,
+          team_name text not null default '',
+          show_team integer not null default 0,
+          specialty text not null default '',
+          topic text not null default '',
+          description text not null default '',
+          project_date text,
+          project_type text not null default '',
+          category_id integer references public.categories(id) on delete set null,
+          image_url text not null default '',
+          file_url text not null default '',
+          is_published integer not null default 1,
+          created_at text not null default public.iso_now(),
+          updated_at text not null default public.iso_now()
+          );
+          create index if not exists idx_projects_date on public.projects(project_date);
+          create index if not exists idx_projects_published on public.projects(is_published);
 
-  CREATE TABLE IF NOT EXISTS surveys (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    start_date TEXT NOT NULL,
-    end_date TEXT NOT NULL,
-    form_url TEXT NOT NULL DEFAULT '',
-    reported_responses INTEGER,
-    is_published INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-  );
+          create table if not exists public.events (
+          id serial primary key,
+          title text not null,
+          description text not null default '',
+          starts_at text not null,
+          ends_at text,
+          location text not null default '',
+          department text not null default '',
+          specialty text not null default '',
+          image_url text not null default '',
+          status text not null default 'scheduled' check (status in ('scheduled','postponed','cancelled')),
+          is_published integer not null default 1,
+          created_at text not null default public.iso_now(),
+          updated_at text not null default public.iso_now()
+          );
+          create index if not exists idx_events_starts on public.events(starts_at);
 
-  -- سجلات استعارة مجهولة الهوية: بدون اسم أو رقم تدريبي أو وسيلة تواصل
-  CREATE TABLE IF NOT EXISTS loans (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    reference_code TEXT NOT NULL UNIQUE,
-    book_id INTEGER REFERENCES books(id) ON DELETE SET NULL,
-    book_title TEXT NOT NULL,
-    specialty TEXT NOT NULL DEFAULT '',
-    borrow_date TEXT NOT NULL,
-    expected_return_date TEXT,
-    status TEXT NOT NULL DEFAULT 'requested' CHECK (status IN ('requested','borrowed','returned','cancelled')),
-    channel TEXT NOT NULL DEFAULT 'msforms' CHECK (channel IN ('msforms','flow','sink')),
-    is_demo INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-  );
-  CREATE INDEX IF NOT EXISTS idx_loans_created ON loans(created_at);
-  CREATE INDEX IF NOT EXISTS idx_loans_book ON loans(book_id);
+          create table if not exists public.surveys (
+          id serial primary key,
+          title text not null,
+          description text not null default '',
+          start_date text not null,
+          end_date text not null,
+          form_url text not null default '',
+          reported_responses integer,
+          is_published integer not null default 1,
+          created_at text not null default public.iso_now(),
+          updated_at text not null default public.iso_now()
+          );
 
-  -- إجابات استطلاع زيارة المكتبة (الجزء غير الشخصي فقط)
-  CREATE TABLE IF NOT EXISTS visit_responses (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    has_visited INTEGER NOT NULL,
-    specialty TEXT NOT NULL DEFAULT '',
-    reasons TEXT NOT NULL DEFAULT '[]',
-    main_service TEXT NOT NULL DEFAULT '',
-    visit_frequency TEXT NOT NULL DEFAULT '',
-    is_demo INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-  );
+          create table if not exists public.loans (
+          id serial primary key,
+          reference_code text not null unique,
+          book_id integer references public.books(id) on delete set null,
+          book_title text not null,
+          specialty text not null default '',
+          borrow_date text not null,
+          expected_return_date text,
+          status text not null default 'requested' check (status in ('requested','borrowed','returned','cancelled')),
+          channel text not null default 'msforms' check (channel in ('msforms','flow','sink')),
+          is_demo integer not null default 0,
+          created_at text not null default public.iso_now(),
+          updated_at text not null default public.iso_now()
+          );
+          create index if not exists idx_loans_created on public.loans(created_at);
+          create index if not exists idx_loans_book on public.loans(book_id);
+          create index if not exists idx_loans_status on public.loans(status);
 
-  -- الإحصائيات: أحداث مجهولة. visitor_hash يُشتق من معرّف جلسة عشوائي + ملح يومي
-  CREATE TABLE IF NOT EXISTS analytics_events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    event_type TEXT NOT NULL,
-    target_id INTEGER,
-    path TEXT NOT NULL DEFAULT '',
-    visitor_hash TEXT NOT NULL DEFAULT '',
-    day TEXT NOT NULL,
-    is_demo INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-  );
-  CREATE INDEX IF NOT EXISTS idx_analytics_type_day ON analytics_events(event_type, day);
-  CREATE INDEX IF NOT EXISTS idx_analytics_target ON analytics_events(event_type, target_id);
+          create table if not exists public.visit_responses (
+          id serial primary key,
+          has_visited integer not null,
+          specialty text not null default '',
+          reasons text not null default '[]',
+          main_service text not null default '',
+          visit_frequency text not null default '',
+          is_demo integer not null default 0,
+          created_at text not null default public.iso_now()
+          );
+          create index if not exists idx_visit_created on public.visit_responses(created_at);
 
-  CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL,
-    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-  );
+          create table if not exists public.analytics_events (
+          id bigserial primary key,
+          event_type text not null,
+          target_id integer,
+          path text not null default '',
+          visitor_hash text not null default '',
+          day text not null,
+          is_demo integer not null default 0,
+          created_at text not null default public.iso_now()
+          );
+          create index if not exists idx_analytics_type_day on public.analytics_events(event_type, day);
+          create index if not exists idx_analytics_target on public.analytics_events(event_type, target_id);
 
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL UNIQUE COLLATE NOCASE,
-    display_name TEXT NOT NULL,
-    password_hash TEXT NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('admin','librarian')),
-    is_active INTEGER NOT NULL DEFAULT 1,
-    token_version INTEGER NOT NULL DEFAULT 0,
-    last_login_at TEXT,
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-  );
-  `,
-];
+          create table if not exists public.settings (
+          key text primary key,
+          value text not null,
+          updated_at text not null default public.iso_now()
+          );
 
-export function migrate(db: DatabaseSync) {
-  db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)');
-  const row = db.prepare('SELECT MAX(version) AS v FROM schema_migrations').get() as { v: number | null };
-  const current = row?.v ?? 0;
-  migrations.forEach((sql, index) => {
+          create table if not exists public.users (
+          id serial primary key,
+          username text not null,
+          display_name text not null,
+          password_hash text not null,
+          role text not null check (role in ('admin','librarian')),
+          is_active integer not null default 1,
+          token_version integer not null default 0,
+          last_login_at text,
+          created_at text not null default public.iso_now()
+          );
+          create unique index if not exists idx_users_username on public.users(lower(username));
+
+          alter table public.categories enable row level security;
+          alter table public.books enable row level security;
+          alter table public.electronic_resources enable row level security;
+          alter table public.projects enable row level security;
+          alter table public.events enable row level security;
+          alter table public.surveys enable row level security;
+          alter table public.loans enable row level security;
+          alter table public.visit_responses enable row level security;
+          alter table public.analytics_events enable row level security;
+          alter table public.settings enable row level security;
+          alter table public.users enable row level security;
+          `,
+  ];
+
+/** Applies pending migrations, each inside its own transaction. */
+export async function migrate(pool: Pool): Promise<void> {
+  await pool.query('create table if not exists public.schema_migrations (version integer primary key, applied_at text not null)');
+  const { rows } = await pool.query<{ v: string | null }>('select max(version) as v from public.schema_migrations');
+  const current = Number(rows[0]?.v ?? 0);
+  for (let index = 0; index < migrations.length; index++) {
     const version = index + 1;
-    if (version <= current) return;
-    db.exec('BEGIN');
+    if (version <= current) continue;
+    const client = await pool.connect();
     try {
-      db.exec(sql);
-      db.prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)').run(version, new Date().toISOString());
-      db.exec('COMMIT');
+      await client.query('begin');
+      await client.query(migrations[index]);
+      await client.query('insert into public.schema_migrations (version, applied_at) values ($1, $2)', [version, new Date().toISOString()]);
+      await client.query('commit');
+      console.log('[db] applied migration ' + version);
     } catch (e) {
-      db.exec('ROLLBACK');
+      await client.query('rollback');
       throw e;
+    } finally {
+      client.release();
     }
-  });
+  }
 }
