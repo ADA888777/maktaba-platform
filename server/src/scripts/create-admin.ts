@@ -1,11 +1,16 @@
-/** إنشاء حساب مسؤولة من الطرفية: npm run create-admin --prefix server */
+/** Creates an administrator account from the terminal: npm run create-admin --prefix server */
 import readline from 'node:readline/promises';
 import { config } from '../config.js';
-import { initDatabase } from '../db/connection.js';
+import { closeDatabase, initDatabase } from '../db/connection.js';
 import { usersRepo } from '../repositories/index.js';
 import { hashPassword, validatePasswordStrength } from '../utils/password.js';
 
-initDatabase(config.databasePath);
+if (!config.databaseUrl) {
+  console.error('DATABASE_URL غير مضبوط — أضيفي سلسلة اتصال Supabase في متغيرات البيئة أولًا');
+  process.exit(1);
+}
+
+await initDatabase(config.databaseUrl);
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const username = (await rl.question('اسم المستخدم (بالإنجليزية): ')).trim();
 const displayName = (await rl.question('الاسم الظاهر: ')).trim() || 'مسؤولة المكتبة';
@@ -21,9 +26,10 @@ if (weak) {
   console.error(weak);
   process.exit(1);
 }
-if (usersRepo.findByUsername(username)) {
+if (await usersRepo.findByUsername(username)) {
   console.error('اسم المستخدم موجود مسبقًا');
   process.exit(1);
 }
-usersRepo.create({ username, displayName, role: 'admin', passwordHash: await hashPassword(password) });
+await usersRepo.create({ username, displayName, role: 'admin', passwordHash: await hashPassword(password) });
 console.log(`تم إنشاء الحساب "${username}" بصلاحية مسؤولة.`);
+await closeDatabase();
