@@ -8,9 +8,10 @@ function needsSsl(connectionString: string): boolean {
 }
 
 /**
- * يحوّل رابط Supabase المباشر إلى رابط Session Pooler تلقائيًا.
- * الاتصال المباشر عبر db.PROJECT.supabase.co متاح على IPv6 فقط، ومنصات مثل Render
- * لا تدعم IPv6 فيظهر الخطأ ENETUNREACH، بينما Session Pooler يعمل عبر IPv4 مجانًا.
+ * يضبط رابط الاتصال قبل استخدامه:
+ * 1) إن وُجد SUPABASE_DB_PASSWORD يُستخدم ككلمة مرور (يُرمّز تلقائيًا فلا حاجة لـ percent-encoding).
+ * 2) رابط Supabase المباشر db.PROJECT.supabase.co يُحوّل إلى Session Pooler؛
+ *    لأن الاتصال المباشر متاح على IPv6 فقط ومنصات مثل Render لا تدعمه (ENETUNREACH).
  */
 export function normalizeSupabaseUrl(connectionString: string): string {
   const prefixMatch = /^postgres(?:ql)?:\/\//i.exec(connectionString);
@@ -18,14 +19,20 @@ export function normalizeSupabaseUrl(connectionString: string): string {
   const prefix = prefixMatch[0];
   try {
     const url = new URL('http://' + connectionString.slice(prefix.length));
+    const passwordOverride = (process.env.SUPABASE_DB_PASSWORD ?? '').trim();
+    if (passwordOverride) {
+      url.password = passwordOverride;
+      console.log('[db] تم استخدام SUPABASE_DB_PASSWORD ككلمة مرور لقاعدة البيانات.');
+    }
     const hostMatch = /^db\.([a-z0-9]+)\.supabase\.co$/i.exec(url.hostname);
-    if (!hostMatch) return connectionString;
-    const projectRef = hostMatch[1];
-    const region = (process.env.SUPABASE_REGION ?? 'ap-northeast-2').trim();
-    url.hostname = 'aws-0-' + region + '.pooler.supabase.com';
-    url.port = '5432';
-    if (!url.username.includes('.')) url.username = 'postgres.' + projectRef;
-    console.log('[db] تم تحويل الاتصال المباشر إلى Session Pooler:', url.hostname);
+    if (hostMatch) {
+      const projectRef = hostMatch[1];
+      const region = (process.env.SUPABASE_REGION ?? 'ap-northeast-2').trim();
+      url.hostname = 'aws-0-' + region + '.pooler.supabase.com';
+      url.port = '5432';
+      if (!url.username.includes('.')) url.username = 'postgres.' + projectRef;
+      console.log('[db] تم تحويل الاتصال المباشر إلى Session Pooler:', url.hostname);
+    }
     return prefix + url.toString().slice('http://'.length);
   } catch {
     return connectionString;
