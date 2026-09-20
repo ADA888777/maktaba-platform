@@ -1,8 +1,8 @@
 /**
- * أنواع المجال وواجهات المستودعات.
- * بقية الخادم يتعامل مع هذه الواجهات فقط، لذلك يمكن استبدال SQLite لاحقًا
- * (مثل PostgreSQL أو SharePoint Lists) بكتابة تنفيذ جديد دون تعديل المسارات.
- */
+* Domain types and repository interfaces.
+* The rest of the server only talks to these interfaces, so the storage layer
+* (PostgreSQL / Supabase) can be swapped without touching routes.
+*/
 
 export type CategoryKind = 'book' | 'resource' | 'project';
 
@@ -145,11 +145,11 @@ export interface ListQuery {
   filters?: Record<string, string | number | boolean | undefined>;
   page?: number;
   pageSize?: number;
-  /** عند true تُعرض العناصر المنشورة/المفعّلة فقط */
-  publicOnly?: boolean;
+  /** when true only published or active items are returned */
+publicOnly?: boolean;
   sort?: string;
-  /** شرط إضافي يبنيه الخادم فقط (لا يُمرَّر من مدخلات المستخدم مباشرة) */
-  where?: { sql: string; params: (string | number)[] };
+  /** extra condition built by the server only (never taken from user input) */
+where?: { sql: string; params: (string | number)[] };
 }
 
 export interface ListResult<T> {
@@ -160,12 +160,12 @@ export interface ListResult<T> {
 }
 
 export interface CrudRepository<T, TInput> {
-  list(query?: ListQuery): ListResult<T>;
-  get(id: number): T | null;
-  create(input: TInput): T;
-  update(id: number, input: Partial<TInput>): T | null;
-  remove(id: number): boolean;
-  count(where?: Record<string, string | number>): number;
+  list(query?: ListQuery): Promise<ListResult<T>>;
+  get(id: number): Promise<T | null>;
+  create(input: TInput): Promise<T>;
+  update(id: number, input: Partial<TInput>): Promise<T | null>;
+  remove(id: number): Promise<boolean>;
+  count(where?: Record<string, string | number>): Promise<number>;
 }
 
 type Editable<T> = Omit<T, 'id' | 'createdAt' | 'updatedAt' | 'categoryName'>;
