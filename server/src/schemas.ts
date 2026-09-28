@@ -27,6 +27,7 @@ export const bookSchema = z
   specialty: text(80).default(''),
   description: text(2000).default(''),
   coverUrl: mediaUrl.default(''),
+  url: z.string().trim().max(1000).refine((v) => v === '' || /^https?:\/\/\S+$/i.test(v), 'يجب أن يبدأ الرابط بـ http:// أو https://').default(''),
   publisher: text(150).default(''),
   publishedYear: nullableInt.refine((v) => v === null || (v >= 1000 && v <= 2100), 'سنة غير صالحة').default(null),
   copiesTotal: z.coerce.number().int().min(0).max(999),
