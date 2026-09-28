@@ -16,6 +16,12 @@ export function Modal({
 }) {
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
+  // نحفظ onClose في ref حتى لا يُعاد تشغيل التأثير مع كل إعادة رسم.
+  // (كان تمرير دالة جديدة في كل render يعيد التركيز إلى أول حقل بعد كل حرف فيُفقد النص المكتوب)
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
@@ -27,7 +33,7 @@ export function Modal({
       (first ?? panel.current)?.focus();
     }, 30);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
       if (e.key === 'Tab' && panel.current) {
         const items = panel.current.querySelectorAll<HTMLElement>(
           'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])',
@@ -51,7 +57,7 @@ export function Modal({
       document.body.style.overflow = prevOverflow;
       prevFocus?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
   const widths = { sm: 'sm:max-w-md', md: 'sm:max-w-xl', lg: 'sm:max-w-3xl', xl: 'sm:max-w-5xl' };
