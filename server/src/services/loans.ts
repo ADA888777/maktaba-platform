@@ -20,6 +20,7 @@ export async function createLoanRequest(input: {
 }): Promise<Loan> {
   const book = await booksRepo.get(input.bookId);
   if (!book || !book.isActive) throw notFound('الكتاب');
+  if (book.url) throw new HttpError(409, 'هذا كتاب إلكتروني يُفتح مباشرة من رابطه ولا يحتاج إلى استعارة');
   if (book.copiesAvailable <= 0) throw new HttpError(409, 'هذا الكتاب غير متاح للاستعارة حاليًا');
   let referenceCode = generateReferenceCode();
   while (await queryOne('SELECT 1 FROM loans WHERE reference_code = $1', [referenceCode])) {
