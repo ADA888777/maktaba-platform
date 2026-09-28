@@ -52,6 +52,8 @@ publicRouter.get('/books', async (req, res) => {
   const status = str(req.query.status);
   if (status === 'available') q.where = { sql: 'books.copies_available > 0', params: [] };
   if (status === 'unavailable') q.where = { sql: 'books.copies_available = 0', params: [] };
+  // الكتب القابلة للاستعارة: متاحة وليست إلكترونية (بدون رابط)
+  if (status === 'borrowable') q.where = { sql: "books.copies_available > 0 AND books.url = ''", params: [] };
   res.json(await booksRepo.list(q));
 });
 
