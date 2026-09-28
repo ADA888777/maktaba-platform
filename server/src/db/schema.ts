@@ -182,6 +182,10 @@ create table if not exists public.categories (
           alter table public.settings enable row level security;
           alter table public.users enable row level security;
           `,
+    `
+    -- رابط اختياري للكتب الإلكترونية: عند تعبئته يظهر زر «فتح الكتاب» بدل «استعارة الكتاب»
+    alter table public.books add column if not exists url text not null default '';
+    `,
   ];
 
 /** Applies pending migrations, each inside its own transaction. */
