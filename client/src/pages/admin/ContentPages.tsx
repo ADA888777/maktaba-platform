@@ -52,16 +52,22 @@ export function BooksAdmin() {
           key: 'copies', header: 'النسخ (المتاح/الإجمالي)',
           render: (b) => <span className="tabular-nums"><strong>{b.copiesAvailable}</strong> / {b.copiesTotal}</span>,
         },
-        { key: 'status', header: 'الحالة', render: (b) => <Badge tone={b.copiesAvailable > 0 ? 'green' : 'gray'}>{b.copiesAvailable > 0 ? 'متاح' : 'غير متاح'}</Badge> },
+        {
+          key: 'status', header: 'الحالة',
+          render: (b) => b.url
+            ? <Badge tone="teal">إلكتروني</Badge>
+            : <Badge tone={b.copiesAvailable > 0 ? 'green' : 'gray'}>{b.copiesAvailable > 0 ? 'متاح' : 'غير متاح'}</Badge>,
+        },
         { key: 'active', header: 'الظهور', render: (b) => published(b.isActive, 'ظاهر', 'مخفي') },
       ]}
-      emptyValues={{ title: '', author: '', categoryId: '', specialty: '', description: '', coverUrl: '', publisher: '', publishedYear: '', copiesTotal: 1, copiesAvailable: 1, isActive: true }}
+      emptyValues={{ title: '', author: '', categoryId: '', specialty: '', description: '', coverUrl: '', url: '', publisher: '', publishedYear: '', copiesTotal: 1, copiesAvailable: 1, isActive: true }}
       toForm={(b) => ({ ...b, categoryId: b.categoryId ? String(b.categoryId) : '', publishedYear: b.publishedYear ?? '' })}
       fromForm={(v) => ({ ...v, categoryId: nullIfEmpty(v.categoryId), publishedYear: nullIfEmpty(v.publishedYear), copiesTotal: Number(v.copiesTotal), copiesAvailable: Number(v.copiesAvailable) })}
       validate={(v) => ({
         title: String(v.title ?? '').trim() ? '' : 'اسم الكتاب مطلوب',
         copiesTotal: Number(v.copiesTotal) >= 0 && v.copiesTotal !== '' ? '' : 'أدخلي عددًا صحيحًا',
         copiesAvailable: Number(v.copiesAvailable) > Number(v.copiesTotal) ? 'لا يمكن أن يتجاوز الإجمالي' : v.copiesAvailable === '' ? 'مطلوب' : '',
+        url: !v.url || /^https?:\/\/\S+$/i.test(String(v.url)) ? '' : 'يجب أن يبدأ الرابط بـ http:// أو https://',
       })}
       fields={[
         { name: 'title', label: 'اسم الكتاب', type: 'text', required: true, span: 2 },
@@ -73,6 +79,7 @@ export function BooksAdmin() {
         { name: 'copiesAvailable', label: 'النسخ المتاحة', type: 'number', required: true, min: 0, hint: 'يتحدث تلقائيًا عند تسليم وإرجاع الاستعارات' },
         { name: 'publishedYear', label: 'سنة النشر', type: 'number' },
         { name: 'coverUrl', label: 'صورة الغلاف', type: 'upload', accept: 'image' },
+        { name: 'url', label: 'رابط الكتاب الإلكتروني', type: 'url', span: 2, hint: 'اختياري — عند إضافته يظهر زر «فتح الكتاب» بدل «استعارة الكتاب». اتركيه فارغًا للكتب الورقية' },
         { name: 'description', label: 'وصف مختصر', type: 'textarea', span: 2, maxLength: 2000 },
         { name: 'isActive', label: 'إظهار الكتاب في الموقع', type: 'toggle', span: 2 },
       ]}

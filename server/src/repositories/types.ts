@@ -21,6 +21,8 @@ export interface Book {
   specialty: string;
   description: string;
   coverUrl: string;
+  /** رابط الكتاب الإلكتروني (فارغ للكتب الورقية) */
+  url: string;
   publisher: string;
   publishedYear: number | null;
   copiesTotal: number;

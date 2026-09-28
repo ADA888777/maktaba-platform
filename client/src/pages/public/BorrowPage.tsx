@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router';
-import { ArrowRight, BookMarked, BookOpen, CheckCircle2, ClipboardList, Search, Send } from 'lucide-react';
+import { ArrowRight, BookMarked, BookOpen, CheckCircle2, ClipboardList, ExternalLink, Search, Send } from 'lucide-react';
 import { api, ApiError, errorMessage } from '../../lib/api';
 import type { Book, ListResult } from '../../lib/types';
 import { useAsync, useDebounced } from '../../hooks/useAsync';
@@ -11,7 +11,7 @@ import { todayISO } from '../../lib/format';
 import { clean, focusFirstError, rules, toLatinDigits, type Errors } from '../../lib/validation';
 import { PageHero, Badge } from '../../components/ui/Misc';
 import { Input, SearchInput } from '../../components/ui/Field';
-import { Button, ButtonLink } from '../../components/ui/Button';
+import { Button, ButtonLink, ExternalButton } from '../../components/ui/Button';
 import { Alert, EmptyState, ErrorState, Spinner } from '../../components/ui/Feedback';
 import { BookCover } from '../../components/public/BookCover';
 import {
@@ -38,7 +38,7 @@ function BookPicker() {
   const [search, setSearch] = useState('');
   const debounced = useDebounced(search);
   const list = useAsync(
-    () => api.get<ListResult<Book>>('/public/books', { search: debounced, status: 'available', pageSize: 12 }),
+    () => api.get<ListResult<Book>>('/public/books', { search: debounced, status: 'borrowable', pageSize: 12 }),
     [debounced],
   );
 
@@ -160,6 +160,21 @@ function BorrowForm({ bookId }: { bookId: number }) {
     );
   }
   const b = book.data;
+  // الكتب الإلكترونية لا تُستعار — تُفتح مباشرة من رابطها
+  if (b.url) {
+    return (
+      <EmptyState
+        icon={BookOpen}
+        title={`«${b.title}» كتاب إلكتروني`}
+        description="هذا الكتاب متاح للقراءة عبر الإنترنت ولا يحتاج إلى طلب استعارة."
+        action={
+          <ExternalButton href={b.url} variant="primary" icon={<ExternalLink className="size-4" />}>
+            فتح الكتاب
+          </ExternalButton>
+        }
+      />
+    );
+  }
   const available = b.copiesAvailable > 0;
 
   const submit = async (e: FormEvent) => {
