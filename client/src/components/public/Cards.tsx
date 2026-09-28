@@ -8,7 +8,8 @@ import { countdownText, fmtDate, fmtDayMonth, fmtTime, fmtWeekday } from '../../
 import { track } from '../../lib/analytics';
 
 export function BookCard({ book }: { book: Book }) {
-  const available = book.copiesAvailable > 0;
+  const isEbook = Boolean(book.url);
+  const available = isEbook || book.copiesAvailable > 0;
   return (
     <article className="card group flex flex-col overflow-hidden transition-[box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-lift)]">
       <div className="flex gap-4 p-4">
@@ -17,7 +18,9 @@ export function BookCard({ book }: { book: Book }) {
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex flex-wrap gap-1.5">
-            {available ? (
+            {isEbook ? (
+              <Badge tone="teal" icon={ExternalLink}>كتاب إلكتروني</Badge>
+            ) : available ? (
               <Badge tone="green" icon={CheckCircle2}>متاح</Badge>
             ) : (
               <Badge tone="gray" icon={XCircle}>غير متاح</Badge>
@@ -31,9 +34,19 @@ export function BookCard({ book }: { book: Book }) {
       </div>
       <div className="mt-auto flex items-center justify-between gap-3 border-t border-ink-100 px-4 py-3">
         <span className="text-xs text-ink-500">
-          {available ? `النسخ المتاحة: ${book.copiesAvailable} من ${book.copiesTotal}` : 'جميع النسخ مستعارة حاليًا'}
+          {isEbook ? 'متاح للقراءة عبر الإنترنت' : available ? `النسخ المتاحة: ${book.copiesAvailable} من ${book.copiesTotal}` : 'جميع النسخ مستعارة حاليًا'}
         </span>
-        {available ? (
+        {isEbook ? (
+          <ExternalButton
+            href={book.url}
+            size="sm"
+            variant="primary"
+            icon={<ExternalLink className="size-4" />}
+            aria-label={`فتح الكتاب: ${book.title} (يفتح في نافذة جديدة)`}
+          >
+            فتح الكتاب
+          </ExternalButton>
+        ) : available ? (
           <ButtonLink to={`/borrow/${book.id}`} size="sm" variant="primary" icon={<BookMarked className="size-4" />}>
             استعارة الكتاب
           </ButtonLink>
